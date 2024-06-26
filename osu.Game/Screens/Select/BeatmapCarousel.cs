@@ -942,7 +942,6 @@ namespace osu.Game.Screens.Select
                     {
                         var panel = setPool.Get(p => p.Item = item);
 
-                        panel.Depth = item.CarouselYPosition;
                         panel.Y = item.CarouselYPosition;
 
                         Scroll.Add(panel);
@@ -962,6 +961,8 @@ namespace osu.Game.Screens.Select
                 {
                     bool isSelected = item.Item.State.Value == CarouselItemState.Selected;
 
+                    bool hasPassedSelection = item.Item.CarouselYPosition < selectedBeatmapSet?.CarouselYPosition;
+
                     // Cheap way of doing animations when entering / exiting song select.
                     const double half_time = 50;
                     const float panel_x_offset_when_inactive = 200;
@@ -976,6 +977,8 @@ namespace osu.Game.Screens.Select
                         item.Alpha = (float)Interpolation.DampContinuously(item.Alpha, 0, half_time, Clock.ElapsedFrameTime);
                         item.X = (float)Interpolation.DampContinuously(item.X, panel_x_offset_when_inactive, half_time, Clock.ElapsedFrameTime);
                     }
+
+                    Scroll.ChangeChildDepth(item, hasPassedSelection ? -item.Item.CarouselYPosition : item.Item.CarouselYPosition);
                 }
 
                 if (item is DrawableCarouselBeatmapSet set)
@@ -1058,8 +1061,6 @@ namespace osu.Game.Screens.Select
             return set;
         }
 
-        private const float panel_padding = 5;
-
         /// <summary>
         /// Computes the target Y positions for every item in the carousel.
         /// </summary>
@@ -1081,10 +1082,18 @@ namespace osu.Game.Screens.Select
                 {
                     case CarouselBeatmapSet set:
                     {
+                        bool isSelected = item.State.Value == CarouselItemState.Selected;
+
+                        float padding = isSelected ? 5 : -5;
+
+                        if (isSelected)
+                            // double padding because we want to cancel the negative padding from the last item.
+                            currentY += padding * 2;
+
                         visibleItems.Add(set);
                         set.CarouselYPosition = currentY;
 
-                        if (item.State.Value == CarouselItemState.Selected || item.State.Value == CarouselItemState.SelectedCollapsed)
+                        if (isSelected)
                         {
                             // scroll position at currentY makes the set panel appear at the very top of the carousel's screen space
                             // move down by half of visible height (height of the carousel's visible extent, including semi-transparent areas)
@@ -1106,7 +1115,7 @@ namespace osu.Game.Screens.Select
                             }
                         }
 
-                        currentY += set.TotalHeight + panel_padding; 
+                        currentY += set.TotalHeight + padding;
                         break;
                     }
                 }
@@ -1337,7 +1346,7 @@ namespace osu.Game.Screens.Select
                 {
                     // we need to block right click absolute scrolling when hovering a carousel item so context menus can display.
                     // this can be reconsidered when we have an alternative to right click scrolling.
-                    if (GetContainingInputManager().HoveredDrawables.OfType<DrawableCarouselItem>().Any())
+                    if (GetContainingInputManager()!.HoveredDrawables.OfType<DrawableCarouselItem>().Any())
                     {
                         rightMouseScrollBlocked = true;
                         return false;
